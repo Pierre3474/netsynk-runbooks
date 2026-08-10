@@ -1,0 +1,70 @@
+# Extrait anonymisé d'une infrastructure réelle. Adresses et domaines
+# remplacés par des plages de documentation. Voir le README.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+spec:
+  project: netsynk
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 85.1.0   # aligné sur le live
+    helm:
+      # Structure alignée sur le live. Les SECRETS ne sont PAS inlinés :
+      #  - mot de passe Grafana → secret "grafana-admin"
+      #  - webhook Discord Alertmanager → secret "alertmanager-discord-secret" (webhook_url_file)
+      valuesObject:
+        defaultRules:
+          rules:
+            etcd: false
+            kubeScheduler: false
+        kubeControllerManager: { enabled: false }
+        kubeEtcd: { enabled: false }
+        kubeProxy: { enabled: false }
+        kubeScheduler: { enabled: false }
+        kubeStateMetrics: { enabled: true }
+        nodeExporter: { enabled: true }
+        grafana:
+          admin:
+            existingSecret: grafana-admin
+            userKey: admin-user
+            passwordKey: admin-password
+          persistence:
+            enabled: true
+            size: 5Gi
+            storageClassName: nfs-k8s
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+        prometheus:
+          prometheusSpec:
+            retention: 7d
+            resources:
+              requests: { cpu: 100m, memory: 256Mi }
+              limits: { memory: 512Mi }
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: nfs-k8s
+                  resources: { requests: { storage: 10Gi } }
+        alertmanager:
+          alertmanagerSpec:
+            resources:
+              requests: { cpu: 10m, memory: 64Mi }
+            secrets:
+              - alertmanager-smtp-secret      # SMTP (existant)
+              - alertmanager-discord-secret   # ⚠️ webhook Discord — à créer (SOPS)
+          # ⚠️ Config routes/receivers/templates volumineuse + sensible.
+          # À importer depuis le live en remplaçant le webhook par :
+          #   discord_configs:
+          #     - webhook_url_file: /etc/alertmanager/secrets/alertmanager-discord-secret/webhook
+          # (ne JAMAIS coller le webhook en clair). Récupérer la config :
+          #   helm get values kube-prometheus-stack -n monitoring -o yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,29 @@
+# Extrait anonymisé d'une infrastructure réelle. Adresses et domaines
+# remplacés par des plages de documentation. Voir le README.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cilium
+  namespace: argocd
+spec:
+  project: netsynk
+  source:
+    repoURL: https://helm.cilium.io
+    chart: cilium
+    targetRevision: 1.17.3   # ⚠️ = version réellement installée (helm list -n kube-system)
+    helm:
+      # Aligné sur le live (helm get values cilium -n kube-system).
+      valuesObject:
+        bgpControlPlane:
+          enabled: true
+        cluster:
+          name: kubernetes
+        operator:
+          replicas: 1
+        routingMode: tunnel
+        tunnelProtocol: vxlan
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  # ⚠️ Composant critique : SYNC MANUEL uniquement. Ne pas activer automated.

@@ -1,0 +1,45 @@
+# Extrait anonymisé d'une infrastructure réelle. Adresses et domaines
+# remplacés par des plages de documentation. Voir le README.
+
+# Pools MetalLB — alignés sur le live (ns ingress-nginx).
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: k8s-pool
+  namespace: ingress-nginx
+spec:
+  addresses:
+    - 192.0.2.200-192.0.2.210
+  autoAssign: true
+  avoidBuggyIPs: false
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: vlan90-pool
+  namespace: ingress-nginx
+spec:
+  addresses:
+    - 192.0.2.200-192.0.2.210
+  autoAssign: true
+  avoidBuggyIPs: false
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: k8s-l2
+  namespace: ingress-nginx
+spec:
+  ipAddressPools:
+    - k8s-pool
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: vlan90-l2
+  namespace: ingress-nginx
+spec:
+  interfaces:
+    - enp6s19
+  ipAddressPools:
+    - vlan90-pool

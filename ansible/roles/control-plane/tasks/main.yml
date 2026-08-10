@@ -1,0 +1,65 @@
+# Extrait anonymisé d'une infrastructure réelle. Adresses et domaines
+# remplacés par des plages de documentation. Voir le README.
+
+---
+- name: kubeadm init
+  ansible.builtin.command:
+    cmd: >
+      kubeadm init
+      --control-plane-endpoint={{ control_plane_endpoint }}
+      --pod-network-cidr={{ pod_subnet }}
+      --service-cidr={{ service_subnet }}
+    creates: /etc/kubernetes/admin.conf
+  register: kubeadm_init
+
+- name: Dossier kube pour root
+  ansible.builtin.file:
+    path: /root/.kube
+    state: directory
+    mode: "0700"
+
+- name: Copier admin.conf
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /root/.kube/config
+    remote_src: true
+    mode: "0600"
+
+- name: Installer Helm si absent
+  ansible.builtin.shell: |
+    curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  args:
+    creates: /usr/local/bin/helm
+
+- name: Ajouter le repo Helm Cilium
+  ansible.builtin.command: helm repo add cilium https://helm.cilium.io
+  register: helm_repo
+  changed_when: "'has been added' in helm_repo.stdout"
+  failed_when: helm_repo.rc != 0 and 'already exists' not in helm_repo.stderr
+
+- name: helm repo update
+  ansible.builtin.command: helm repo update
+  changed_when: false
+
+- name: Installer / mettre à jour Cilium (tunnel VXLAN — aligné sur le live)
+  ansible.builtin.shell: |
+    helm upgrade --install cilium cilium/cilium \
+      --version {{ cilium_version }} \
+      --namespace kube-system \
+      --set routingMode=tunnel \
+      --set tunnelProtocol=vxlan \
+      --set bgpControlPlane.enabled=true \
+      --set operator.replicas=1
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: cilium_install
+  changed_when: "'STATUS: deployed' in cilium_install.stdout"
+
+- name: Générer la commande de jonction
+  ansible.builtin.command: kubeadm token create --print-join-command
+  register: join_cmd
+  changed_when: false
+
+- name: Exposer la commande de jonction aux workers
+  ansible.builtin.set_fact:
+    kube_join_command: "{{ join_cmd.stdout }}"

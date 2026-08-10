@@ -1,0 +1,52 @@
+# Extrait anonymisé d'une infrastructure réelle. Adresses et domaines
+# remplacés par des plages de documentation. Voir le README.
+
+# Config Promtail identique sur nas / vault / stand / llm
+# Seul le label `host:` change par nœud
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /var/lib/promtail/positions.yaml
+
+clients:
+  - url: http://192.0.2.60:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: journal
+    journal:
+      max_age: 12h
+      labels:
+        job: journal
+        host: <NODE_NAME>   # nas | vault | stand | llm
+    relabel_configs:
+      - source_labels: [__journal__systemd_unit]
+        target_label: unit
+      - source_labels: [__journal_priority_keyword]
+        target_label: level
+
+  - job_name: syslog
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: syslog
+          host: <NODE_NAME>
+          __path__: /var/log/syslog
+
+  - job_name: pve
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: pve
+          host: <NODE_NAME>
+          __path__: /var/log/pve/tasks/active
+
+  - job_name: kern
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: kern
+          host: <NODE_NAME>
+          __path__: /var/log/kern.log

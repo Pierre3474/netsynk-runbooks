@@ -1,0 +1,32 @@
+# Extrait anonymisé d'une infrastructure réelle. Adresses et domaines
+# remplacés par des plages de documentation. Voir le README.
+
+# CloudNativePG — cluster PostgreSQL HA (3 instances). Aligné sur le live.
+# Primary courant : postgre-db-2 (géré par l'opérateur).
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgre-db
+  namespace: databases
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.3-system-trixie
+  primaryUpdateStrategy: unsupervised
+  enableSuperuserAccess: false
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+      encoding: UTF8
+      localeCType: C
+      localeCollate: C
+  postgresql:
+    parameters:
+      max_connections: "200"
+  storage:
+    size: 10Gi
+    storageClass: nfs-k8s
+  monitoring:
+    enablePodMonitor: false
+  # backup:
+  #   barmanObjectStore: ...   # cible PITR (S3/MinIO) — à ajouter (point DR)

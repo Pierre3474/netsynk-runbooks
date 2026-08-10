@@ -1,0 +1,21 @@
+# Extrait anonymisé d'une infrastructure réelle. Adresses et domaines
+# remplacés par des plages de documentation. Voir le README.
+
+---
+- name: Préparation OS commune (containerd + paquets K8s)
+  hosts: k8s
+  become: true
+  roles:
+    - common
+
+- name: Initialisation du control-plane + Cilium
+  hosts: control_plane
+  become: true
+  roles:
+    - control-plane
+
+- name: Jonction des workers
+  hosts: workers
+  become: true
+  roles:
+    - worker

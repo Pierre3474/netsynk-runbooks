@@ -1,0 +1,28 @@
+# Extrait anonymisé d'une infrastructure réelle. Adresses et domaines
+# remplacés par des plages de documentation. Voir le README.
+
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgre-db
+  namespace: databases
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.3-system-trixie
+  storage:
+    size: 10Gi
+    storageClass: nfs-k8s
+  postgresql:
+    parameters:
+      max_connections: "200"
+      wal_level: logical
+      wal_keep_size: 512MB
+      ssl_min_protocol_version: TLSv1.3
+      ssl_max_protocol_version: TLSv1.3
+  replicationSlots:
+    highAvailability:
+      enabled: true
+  enablePDB: true
+  enableSuperuserAccess: false
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: restart
