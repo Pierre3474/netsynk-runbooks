@@ -1,72 +1,62 @@
 # netsynk-runbooks
 
-Extraits **réels et anonymisés** d'une plateforme cloud privée que j'exploite
-en production depuis 2023 : cluster Proxmox en haute disponibilité, Kubernetes
-monté par kubeadm, PostgreSQL répliqué, supervision de bout en bout.
+Extraits anonymisés de la configuration de ma plateforme personnelle, en service depuis 2023 : un cluster Proxmox de trois nœuds, un cluster Kubernetes installé avec kubeadm, la supervision.
 
-Les dépôts d'exploitation restent privés — ils contiennent des adresses, des
-noms de machines et des références de secrets. Ce dépôt-ci existe pour montrer
-**comment c'est écrit**, pas pour être déployé tel quel.
+Les dépôts d'exploitation sont privés, parce qu'ils contiennent des adresses, des noms de machines et des références de secrets. Ce dépôt montre comment les fichiers sont écrits. Il n'est pas prévu pour être déployé tel quel.
 
-Contexte détaillé et arbitrages : [portfolio.netsynk.eu](https://portfolio.netsynk.eu)
+Présentation du projet : [portfolio.netsynk.eu](https://portfolio.netsynk.eu)
 
-## Comment ces fichiers sont produits
+## Comment les fichiers sont produits
 
-Ils ne sont pas copiés à la main. `tools/sanitize.py` lit les fichiers dans les
-dépôts privés, applique une table de substitution, puis **refuse d'écrire** tout
-fichier où survit une IP privée, un domaine interne, une clé ou un secret en
-clair.
+`tools/sanitize.py` lit les fichiers dans les dépôts privés et applique une table de substitution. Il refuse d'écrire un fichier qui contient encore une IP privée, un domaine interne, une clé ou un secret en clair, et sort alors en erreur.
 
 ```bash
 python3 tools/sanitize.py
 ```
 
-Le script sort en erreur si un extrait échoue au contrôle : impossible de
-publier une fuite par distraction. Un secret ne se relit pas, il se vérifie.
-
 Substitutions appliquées :
 
-| Réel | Publié | Pourquoi |
+| Réel | Publié | Référence |
 |---|---|---|
-| IP du LAN | `192.0.2.x` | RFC 5737, réservée à la documentation |
+| IP du LAN | `192.0.2.x` | RFC 5737, plage réservée à la documentation |
 | Tunnel entre sites | `198.51.100.x` | RFC 5737 |
 | IP publique du VPS | `203.0.113.x` | RFC 5737 |
 | `*.netsynk.eu` | `*.example.com` | RFC 2606 |
 | `*.netsynk.local` | `*.example.internal` | RFC 2606 |
-| Noms d'hôtes, emails, MAC | placeholders | données identifiantes |
+| Noms d'hôtes, e-mails, adresses MAC | valeurs factices | données identifiantes |
+
+Un workflow GitHub Actions (`.github/workflows/no-secrets.yml`) refait ce contrôle à chaque push.
 
 ## Contenu
 
 ### `kubernetes/`
 
-| Fichier | Ce qu'il montre |
+| Fichier | Contenu |
 |---|---|
-| `postgres-cluster.yaml` | Cluster PostgreSQL à 3 instances via CloudNativePG. La bascule du primaire est gérée par l'opérateur, et testée à la main — une restauration prend des minutes, une bascule des secondes. |
-| `cloudnativepg-cluster.yaml` | Seconde déclinaison, avec le paramétrage du stockage et des sauvegardes. |
-| `metallb-pool.yaml` | Pools d'adresses séparés pour l'ingress interne et l'ingress public : ce qui n'a pas à être exposé ne l'est pas. |
-| `cilium-application.yaml` | Cilium en CNI, déployé en GitOps. Choisi contre Flannel pour les politiques réseau applicatives — le reste de l'infra est segmenté, laisser les pods se parler librement aurait annulé ce travail. |
-| `monitoring-application.yaml` | Pile Prometheus / Grafana. Les identifiants viennent d'un `existingSecret`, jamais du manifeste. |
+| `postgres-cluster.yaml` | Cluster PostgreSQL de 3 instances avec CloudNativePG. Utilisé jusqu'en août 2026 : la base a depuis été déplacée dans un conteneur dédié, hors du cluster. |
+| `cloudnativepg-cluster.yaml` | Variante avec le paramétrage du stockage et des sauvegardes. |
+| `metallb-pool.yaml` | Deux pools d'adresses : un pour l'ingress interne, un pour l'ingress public. |
+| `cilium-application.yaml` | Cilium comme CNI, déployé par ArgoCD. Choisi pour ses politiques réseau entre pods. |
+| `monitoring-application.yaml` | Prometheus et Grafana. Les identifiants viennent d'un `existingSecret`. |
 
 ### `ansible/`
 
-| Fichier | Ce qu'il montre |
+| Fichier | Contenu |
 |---|---|
 | `site.yml` | Point d'entrée : rôles appliqués par groupe de machines. |
-| `roles/common/tasks/main.yml` | Socle appliqué à tous les nœuds. |
+| `roles/common/tasks/main.yml` | Configuration commune à tous les nœuds. |
 | `roles/control-plane/tasks/main.yml` | Préparation d'un nœud de plan de contrôle avant `kubeadm`. |
 
 ### `monitoring/`
 
-| Fichier | Ce qu'il montre |
+| Fichier | Contenu |
 |---|---|
-| `promtail-node.yml` | Collecte des journaux d'un nœud Proxmox vers Loki. Les journaux sont centralisés parce qu'un incident se relit après coup, pas pendant. |
+| `promtail-node.yml` | Envoi des journaux d'un nœud Proxmox vers Loki. |
 
-## Ce que ce dépôt ne contient pas
+## Ce que le dépôt ne contient pas
 
-Volontairement : aucun secret, même chiffré ; aucun plan d'adressage réel ;
-aucune règle de pare-feu ; aucun inventaire de machines. La valeur d'un runbook
-est dans sa structure, pas dans ses adresses.
+Aucun secret, même chiffré. Pas de plan d'adressage réel, pas de règles de pare-feu, pas d'inventaire de machines.
 
 ## Licence
 
-MIT — voir [LICENSE](LICENSE). Reprenez ce qui vous sert.
+MIT, voir [LICENSE](LICENSE).
